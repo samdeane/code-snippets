@@ -1,0 +1,511 @@
+<?php
+// 
+// This module was originally based on the glossary module, and still contains most of its code.
+
+/*
+    $Id: autolink.module 366 2006-05-20 19:09:09Z sam $
+    
+    A Drupal filter module to automatically add links certain terms in node text. 
+    Copyright (C) 2004-2005 Sam Deane, Elegant Chaos.
+
+
+VERSION
+=======
+
+1.4
+
+		
+LICENSE
+=======
+	
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  
+    
+READ ME
+=======
+
+The Autolink module saves users from having to manually enter links for commonly used URLs.
+
+The module scans posts for a set of terms. Any term found is optionally replaced with some
+other text, and then automatically linked to its corresponding URL.
+
+The module uses Drupal's built in taxonomy feature, so you can organize your terms in a Drupal
+vocabulary. Autolink terms are represented with the taxonomy terms in the autolink vocabulary.
+The descriptions are used to provide the URL that the term should link to.
+
+
+Requirements
+------------
+
+This module has been tested with the 4.6.x version of Drupal. It will probably work with older
+versions - please let me know how you get on if you try it, so that I can update this documentation.
+
+
+Installation
+------------
+
+1.  Copy the autolink folder to the Drupal modules/ directory. Drupal should automatically
+    detect the module. Enable the module on the modules' administration page.
+
+2.  Autolink terms are managed as vocabularies within the categories module.
+
+    To get started with Autolink, create a new vocabulary on the
+    categories administration page. The vocabulary need not be associated
+    with any modules.
+
+3.  Next, you have to setup the input formats you want to use Autolink with.
+    At the input formats page select an input format to configure. Select the
+    Autolink filter checkbox and press Save configuration. Now select the
+    configure filters tab and select the vocabulary and apply other settings.
+
+
+Usage
+-----
+
+This module uses a vocabulary to define a list of terms. When any of these
+terms occurs in some node text, a link is added. 
+
+You create autolink items by adding terms to the vocabulary that you created
+in step (2) of the installation instructions.
+
+For each term:
+
+-    the title of the term should be the text that should be linked
+-    the first line of the description should be the URL to link to
+-    an optional second line can contain text to replace the entry with
+-    an optional third line can contain text to insert into a rel attribute
+-    you can add synonyms - these will be replaced in the same way as the term's title would be
+
+The first line of the taxonomy term's description field is used to define
+the URL to link to.
+
+If a second line exists in the description field, it is used as text to
+replace the actual term. This allows you to use long terms in the text
+(to avoid accidental matching), but have the long term replaced by a shorter
+one in the actual rendered output, to make it more readable.
+
+As an example of why replacement text is useful, say we defined a term "Apple", to
+be linked to "http://www.apple.com". The danger with this is that an article 
+containing the word "Apple" in another context might inappropriately be linked to
+the Apple website. We could use a less ambiguous term, like "Apple Computer Inc.", 
+but we don't want that text to have to actually appear in all of our articles,
+because it is unnecessarily formal. The solution is do match for "Apple Computer Inc."
+in the article, but provide a replacement that converts it to "Apple" in the
+final output. Now it's unlikely to be matched incorrectly, but the text will still read ok.
+
+Any text placed on the third line will be inserted into a rel="" tag inside the link.
+This allows you, for example, to add XFN support to your autolinks.
+
+Notes
+-----
+
+I generally use this module to automatically link to names of people, companies and products
+that I often refer to in my blog posts.
+
+Linking _every_ instance of a particular word to the same place is obviously a bit of
+a blunt tool, and can lead to unexpected results. Many words obviously have more than
+one meaning or context, so something that is a product name might also be a company name,
+a band name, and a perfectly normal english word!
+
+There are a few ways to get round this problem. One is obviously to only define autolinks for
+terms that are totally unambiguous - e.g. Drupal. That's fine, but not that useful.
+
+Another is to use the replacement feature (see the example above in USAGE) so that the actual
+terms defined are quite unambigous, but the text that appears to readers still looks normal. So
+I might define a term for my friend Kevin Marks, which links to his website, but also define a replacement
+which replaces "Kevin Marks" with "Kevin" in the text. Clearly this has a down side too, since I now can't
+actually get the text "Kevin Marks" to appear anywhere, it will always be replaced with "Kevin"!
+
+Perhaps the safest solution is to use a prefix (or postfix) for every term which isn't likely to crop up
+accidentally. For example, if I make the search term "Alink Kevin Marks", and the replacement "Kevin" then
+I still get behaviour that I want, but I can also manually insert the text "Kevin Marks" if I want to - it
+won't be replaced by autolink because it doesn't include the prefix. The downside of this approach is that 
+the unfiltered text starts looking a bit weird!
+
+
+Authors
+-------
+
+Written by Sam Deane <sam@elegantchaos.com>.
+Originally based on a subset of the glossary module by Frodo Looijaard, Gabor Hojtsy, Al Maw, Moshe Weitzman et al.
+
+The latest information on this module can always be found at <http://www.elegantchaos.com/projects/autolink>.		
+
+		
+CHANGES
+=======
+
+Version 1.4
+-----------
+
+20 May 2006
+Updated code for Drupal 4.7.0
+
+Version 1.3
+-----------
+
+16 August 2005
+Updated code for Drupal 4.6.x.
+
+Version 1.2
+-----------
+
+22 July 2005
+Added support for the rel attribute, to allow, for example, 
+XFN tags [XFN] to be added to the automatically generated links
+
+
+Version 1.1
+-----------
+
+30 June 2005
+Added text substitution
+
+
+Version 1.0
+-----------
+
+4 January 2005
+First public release, based on modified version of glossary.module
+
+
+To Do
+-----
+
+- add prefix/postfix setting to prefix every replacement automatically
+- possibly remove old options inherited from glossary module
+
+
+Links
+-----
+
+[XFN]: <http://gmpg.org/xfn/> The XFN Specification.
+
+
+*/
+
+
+function autolink_help($section = "admin/help#autolink") {
+  $output = '';
+
+  switch ($section) {
+    case 'admin/help#autolink':
+      return t('<p>Autolink will automatically add links for a configurable list of terms.</p>
+      <p>The autolink module scans posts for autolink terms (and their synonyms) in the body. If found, a link is defined for the term - clicking leads the user to that term\'s associated url.</p>
+      <p>autolink terms are managed as vocabularies within the taxonomy.module. To get started with autolink, create a new vocabulary on the %taxonomy_admin page. The vocabulary need not be associated with any modules. Add a few terms to the vocabulary. The term title should be the autolink entry and the description should be the URL to link the term to.</p>
+      <p>Next, you have to setup the input formats you want to use the autolink with. At the %input_formats page select an input format to configure. Select the autolink filter checkbox and press Save configuration. Now select the configure filters tab and select the vocabulary and apply other settings.</p>
+      <p>Administration of autolink requires <em>%permissions</em> permissions.</p>', 
+      array("%permissions" => join(", ", array(t("administer autolink"), t("administer taxonomy"), t("access administration pages"))), "%taxonomy_admin" => l('administer &raquo; categories', 'admin/taxonomy'), "%autolink_settings" => url('admin/filters/autolink'), "%input_formats" => l('administer &raquo; input formats', 'admin/filters'), "%glossaries" => l('glossaries', 'autolink')));
+      break;
+    case 'admin/modules#description':
+      return t('Maintain automatic links on your site.');
+      break;
+    case 'filter#long-tip':
+    case 'filter#short-tip':
+      return t('autolink terms will be automatically linked to their associated URLs');
+    case 'autolink':
+      return t('Below are the defined categories which are in use as autolinks. Please select one to view or edit.');
+  }
+}
+
+ 
+function autolink_perm() {
+  return array("administer autolink");
+}
+
+
+function _autolink_filter_settings($format) {
+
+  $options[0] = t('<none>');
+  foreach (taxonomy_get_vocabularies() as $vocabulary) {
+    $options[$vocabulary->vid] = $vocabulary->name;
+  }
+  
+  $group1 = form_select(t("Select Vocabulary"), "autolink_vids_$format", variable_get("autolink_vids_$format", array()), $options, t("Select one or more vocabularies which hold all terms for your autolink. When enabled, posts will be scanned for autolink terms. A link will be added for each term found."), 0, TRUE, TRUE);
+  $group1 .= form_select(t("Match type"), "autolink_match_$format", variable_get("autolink_match_$format", "match"), array("b" => t("word"), "lr" => t("right or left substring"), "l" => t("left substring"), "r" => t("right substring"), "s" => t("any substring")), t("Choose the match type of autolink links."));
+  $group1 .= form_select(t("Case sensitivity"), "autolink_case_$format", variable_get("autolink_case_$format", "1"), array(t("case insensitive"), t("case sensitive")), t("Match either case sensitive or not. Case sensitive matches are far not that resource intensive."));
+  $group1 .= form_select(t("Replace matches"), "autolink_replace_all_$format", variable_get("autolink_replace_all_$format", 0), array(t("only the first match"), t("all matches")), t("Whether only the first match should be replaced or all matches."));
+  $output = form_group(t("Autolink filter"), $group1);
+
+  return $output;
+}
+
+function autolink_filter_tips($delta, $format, $long = false) {
+  return $long ? autolink_help('filter#long-tip') : autolink_help('filter#short-tip');
+}
+
+function autolink_filter($op, $delta = 0, $format = -1, $text = "") {
+  switch ($op) {
+    case "list":
+      return array(0 => t("Automatic Links filter"));
+    case "description":
+      return autolink_help('admin/modules#description');
+    case "process":
+      return _autolink_filter_process($format, $text);
+    case "settings":
+      return _autolink_filter_settings($format);
+    default:
+      return $text;
+  }
+}
+
+function autolink_taxonomy($op, $type, $object = NULL) {
+	if ($object)
+	{
+		_autolink_clear_cache(0, $object['vid']);
+	}
+}
+
+function _autolink_filter_process($format, $text) {
+  
+  if (variable_get("autolink_vids_$format", 0)) {
+
+    $text = " ". $text ." ";
+    $replace_mode = variable_get("autolink_replace_$format", "superscript");
+    $terms = _autolink_get_terms($format);
+    
+    foreach ($terms as $term) {
+      $term_title = $term->name .": ". strip_tags($term->description);
+      $params = explode("\r\n", $term->description);
+      $linkto = $params[0];
+      $linkas = $params[1];
+      $linkrel = $params[2];
+      if ($linkrel) {
+           $relcode = ' rel="' . $linkrel . '"';
+      }
+      else {
+           $relcode = '';
+      }
+      $ins_before = '<a class="autolink-term" href="' . $linkto . '"' . $relcode . '>';
+      $ins_after = '</a>';
+
+      // replace term and synonyms with the desired new HTML code
+      foreach ($term->synonyms as $candidate) {
+        $text = _autolink_insertlink($format, $text, $candidate, $ins_before, $ins_after, $linkas);
+      }
+    }
+  }
+  return $text;
+}
+
+/**
+* Insert autolink links to $text after every $match that is not inside a link.
+* $ins_before is prepended to the matches, $_insafter is appended to them.
+* Match type and replace mode all depend on user settings.
+*
+* TODO: improve performance with not keeping *2.5 copies* of the string in memory: 
+*         $text                 - original
+*         $newtext              - transformed
+*         $before . $this_match - for checking stuff
+*/
+function _autolink_insertlink($format, &$text, $match, $ins_before, $ins_after, $linkas) {
+
+  $findfunc = (variable_get("autolink_case_$format", "1") ? "strpos" : "stripos");
+  $next = $findfunc($text, $match);
+  
+  if ($next === FALSE) { // no match at all
+    return $text;
+  }
+  else { // at least one match
+    $prevend    = 0;
+    $newtext    = '';
+    $matchlen   = strlen($match);
+    $textlen    = strlen($text);
+    $replaceall = variable_get("autolink_replace_all_$format", 0);
+    
+    while ($next && ($next <= $textlen)) {
+      
+      // get parts of the match for further investigation
+      $before     = substr($text, 0, $next);
+      $this_match = substr($text, $next, $matchlen);
+      
+      // see if we have a proper match or not
+      $open  = substr_count($before, "<");
+      $close = substr_count($before, ">");
+      $opena  = substr_count($before, "<a ");
+      $closea = substr_count($before, "</a>");
+      $proper_match = FALSE;
+      if ($opena <= $closea && $open <= $close) { // Not in an open link
+        switch (variable_get("autolink_match_$format", "b")) {
+          case "lr": // require word break left or right
+              $proper_match = (_autolink_is_boundary($text {$next - 1}) ||
+                               _autolink_is_boundary($text {$next + $matchlen}));
+              break;
+          case "b": // require word break left and right
+              $proper_match = (_autolink_is_boundary($text {$next - 1}) &&
+                               _autolink_is_boundary($text {$next + $matchlen}));
+              break;
+          case "l":  // require word break left
+              $proper_match = _autolink_is_boundary($text {$next - 1});
+              break;
+          case "r": // require word break right
+              $proper_match = _autolink_is_boundary($text {$next + $matchlen});
+              break;
+          case "s": // match any substring
+          default:
+              $proper_match = TRUE;
+              break;
+        }
+      }
+      
+      if ($proper_match) { // found match
+        $rep = $linkas ? $linkas : $this_match;
+        $newtext .= substr($text, $prevend, ($next - $prevend)) . $ins_before . $rep . $ins_after;
+        if ($replaceall == 0) { 
+          return $newtext . substr($text, $next + $matchlen); 
+        }
+      }
+      else { // not applicable match
+        $newtext .= substr($text, $prevend, ($next - $prevend)) . $this_match;
+      }
+      
+      // Step further in finding the next match
+      $prevend = $next + $matchlen;
+      $next = $findfunc($text, $match, $prevend);
+    }
+    // Append remaining part
+    return $newtext . substr($text, $prevend);
+  }
+}
+
+function _autolink_alphabar($vid, &$tree) {
+  $blocks = array(range('0', '9'), range('a', 'z'));
+
+  $found_letters = array();
+  foreach ($tree as $key=>$term) {
+    if ($term->depth == 0) {
+      $firstletter = strtolower($term->name[0]);
+      if (! array_key_exists($firstletter, $found_letters)) {
+        $found_letters[$firstletter] = 1;
+        $tree[$key]->firstletter = $firstletter;
+      }
+    }
+  }
+  
+  foreach ($blocks as $block) {
+    $found = False;
+    foreach ($block as $entry) {
+      if (array_key_exists($entry, $found_letters)) {
+        $found = True;
+        break;
+      }
+    }
+    if ($found) {
+      foreach ($block as $entry) {
+        if (! array_key_exists($entry, $found_letters)) {
+          $found_letters[$entry] = 0;
+        }
+      }
+    }
+  }
+   
+
+  $output = "\n<div class=\"autolink-links\">";   
+  $letters = array_keys($found_letters);
+  sort($letters);
+  foreach ($letters as $letter) {
+    if ($found_letters[$letter]) {
+      $links[] = l($letter, 'autolink/'.$vid, NULL, NULL, 'letter' . $letter);
+    } 
+    else {
+      $links[] = $letter;
+    }
+  }
+  if (count($links)) {
+    $output .= theme_links($links);
+  }
+  $output .= "</div>\n";
+  return $output;
+}
+
+
+function autolink_help_page() {
+  print theme('page', autolink_help('admin/help#autolink'));
+}
+
+function _autolink_get_terms($format) {
+  static $terms = FALSE;
+  
+  if ($terms === FALSE) {
+    $terms = $synonyms = array();
+    $vids = variable_get("autolink_vids_$format", 0);
+    
+    foreach ($vids as $vid) {
+      $synonyms = _autolink_get_synonyms($vid);
+    
+      // Get all autolink terms and attach synonyms.
+      // omit terms without a description. those are usually container terms.
+      $result = db_query("SELECT t.name, t.description, t.tid, COUNT(tn.nid) as nodes FROM {term_data} t LEFT JOIN {term_node} tn ON t.tid = tn.tid WHERE t.vid = %d GROUP BY t.tid, t.name, t.description ORDER BY LENGTH(t.name) DESC", $vid);
+      while ($term = db_fetch_object($result)) {
+        if ($term->description) {
+          $term->synonyms = $synonyms[$term->tid];
+          $term->synonyms[] = $term->name;
+          $term->vid = $vid;
+          $terms[] = $term;
+        }
+      }
+    }
+  }
+  
+  return $terms;
+}
+
+// Get all synonyms for all autolink terms
+function _autolink_get_synonyms($vid) {
+  $result = db_query("SELECT ts.tid, ts.name FROM {term_synonym} ts, {term_data} t WHERE ts.tid = t.tid AND t.vid = %d", $vid);
+  while ($synonym = db_fetch_object($result)) {
+    $synonyms[$synonym->tid][] = $synonym->name;
+  }
+  return $synonyms;
+}
+
+// This seems to be 1.2 times faster in fine-grained testing then
+// the ereg solution used before. The chars used here are from the
+// grep info page.
+function _autolink_is_boundary($char) {
+  return (strpos("!\"#\$%&'()*+,-./:;<=>?@[\]^_`{|}~ \t\n\r", $char) !== FALSE);
+}
+
+// Natively only available in PHP 5+
+// WARNING: Eats a tremendous amount of memory!
+if (!function_exists("stripos")) {
+  function stripos($haystack, $needle, $offset = 0) {
+    return strpos(strtoupper($haystack), strtoupper($needle), $offset);
+  }
+}
+
+function autolink_trip_search_taxonomy($term) {
+  return l($term->name, "autolink", NULL, NULL, $term->tid). trip_search_teaser($term->description);
+}
+
+function _autolink_clear_cache($format, $vid) {
+  // We could throw less things away if we checked which filter formats
+  // used the autolink filter, and we only threw those away. In practice,
+  // most if not all formats would use the autolink filter, so we just 
+  // get rid of them all.
+  if ($format) {
+    cache_clear_all('filter:'.$format, true);
+  } 
+  else {
+    cache_clear_all('filter:', true);
+  }
+}
+
+
+function _autolink_cmp_strcase($a, $b) {
+  return strcmp(strtolower($a), strtolower($b));
+}
+
+?>

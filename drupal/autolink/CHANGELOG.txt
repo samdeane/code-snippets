@@ -1,0 +1,49 @@
+CHANGES
+=======
+
+Version 1.4
+-----------
+
+20 May 2006
+Updated code for Drupal 4.7.0
+
+Version 1.3
+-----------
+
+16 August 2005
+Updated code for Drupal 4.6.x.
+
+
+Version 1.2
+-----------
+
+22 July 2005
+Added support for the rel attribute, to allow, for example, 
+XFN tags [XFN] to be added to the automatically generated links
+
+
+Version 1.1
+-----------
+
+30 June 2005
+Added text substitution
+
+
+Version 1.0
+-----------
+
+4 January 2005
+First public release, based on modified version of glossary.module
+
+
+To Do
+-----
+
+- add prefix/postfix setting to prefix every replacement automatically
+- possibly remove old options inherited from glossary module
+
+
+Links
+-----
+
+[XFN]: <http://gmpg.org/xfn/> The XFN Specification.
