@@ -1,0 +1,3 @@
+TREE="ECFoundation"
+LOCAL="frameworks/${TREE}"
+URL="ssh://<redacted>/ECFoundation.git"
